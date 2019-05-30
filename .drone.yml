@@ -1,0 +1,27 @@
+workspace:
+  base: /go
+  path: src/k8s.io/dns
+
+pipeline:
+  build:
+    image: golang:1.12.5
+    environment:
+      CGO_ENABLED: "0"
+    commands:
+      - cd /go/src/k8s.io/dns/
+      - export VERSION="$(git describe --tags --always --dirty)"
+      - mkdir -p bin/amd64
+      - go build -o bin/amd64/node-cache -ldflags "-X k8s.io/dns/pkg/version.VERSION=$VERSION" ./cmd/node-cache
+      - sed --in-place -e s/ARG_ARCH/amd64/g -e s/ARG_BIN/node-cache/g -e "s/ARG_VERSION/$VERSION/g" Dockerfile.node-cache
+      - echo -n "latest,$DRONE_COMMIT_SHA,v$VERSION" > .tags
+
+  push:
+    image: plugins/docker
+    repo: registry.usw.co/kubernetes/k8s-dns-node-cache
+    context: .
+    dockerfile: Dockerfile.node-cache
+    when:
+      branch:
+        - master
+      event:
+        - push
